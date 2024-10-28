@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "Asset Alchemist"
+version = "0.1.0"
+description = "PDF Reader extractor."
+authors = ["Travis Little <littlemtravis@gmail.com>"]
+license = "Proprietary"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.11"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.3"
+
+[tool.poetry.group.lint.dependencies]
+flake8 = "^4.0.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.1.0"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+sections="FUTURE,STDLIB,THIRDPARTY,COTERRA,FIRSTPARTY,LOCALFOLDER"
+
+[tool.pyright]
+include = ["src"]
+exclude = [".history", ".git"]
+typeCheckingMode = "strict"
