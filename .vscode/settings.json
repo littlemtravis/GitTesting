@@ -1,5 +1,5 @@
 {
-    "python.defaultInterpreterPath": "/usr/local/bin/python",
+    "python.defaultInterpreterPath": "/venv/bin/python",
     "python.languageServer": "Pylance",
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.logLevel": "Trace",

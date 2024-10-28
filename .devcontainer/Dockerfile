@@ -1,32 +1,93 @@
-# For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3.10 AS base
+# syntax=docker/dockerfile:1
+# Keep this syntax directive! It's used to enable Docker BuildKit
 
-ENV \ 
-    # Keeps Python from generating .pyc files in the container
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONFAULTHANDLER=1 \
-    # Turns off buffering for easier container logging
-    PYTHONUNBUFFERED=1 \
-    # The seed that is used for generating the hash(). Fixed is good for development but random may be better for production.
-    PYTHONHASHSEED=0 \
-    # PYTHONPATH=":./src" \
-    # Poetry's configuration:
+################################
+# PYTHON-BASE
+# Sets up all our shared environment variables
+################################
+FROM python:3.10-slim AS python-base
+
+# Python
+ENV PYTHONUNBUFFERED=1 \
+    # pip
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    \
+    # Poetry
+    # https://python-poetry.org/docs/configuration/#using-environment-variables
+    POETRY_VERSION=1.8.3 \
+    # make poetry install to this location
+    POETRY_HOME="/opt/poetry" \
+    # do not ask any interactive question
     POETRY_NO_INTERACTION=1 \
+    # never create virtual environment automaticly, only use env prepared by us
     POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_CACHE_DIR='/var/cache/pypoetry' \
-    POETRY_HOME='/usr/local' \
-    POETRY_VERSION=1.8.4
+    \
+    # this is where our requirements + virtual environment will live
+    VIRTUAL_ENV="/venv"
 
-RUN apt-get update \
-    && apt-get install -y sudo \
-    && useradd -ms /bin/bash codespace
+# prepend poetry and venv to path
+ENV PATH="$POETRY_HOME/bin:$VIRTUAL_ENV/bin:$PATH"
 
-USER codespace
-WORKDIR /home/codespace
+# prepare virtual env
+RUN python -m venv $VIRTUAL_ENV
 
-# RUN curl -sSL https://install.python-poetry.org | python3 -
+################################
+# BUILDER-BASE
+# Used to build deps + create our virtual environment
+################################
+FROM python-base AS builder-base
 
-# COPY pyproject.toml poetry.lock /
+RUN apt-get update && \
+    apt-get install -y \
+    gnupg \
+    ca-certificates \
+    build-essential \
+    git \
+    curl
 
-# # Project initialization:
-# RUN poetry install
+# install poetry - respects $POETRY_VERSION & $POETRY_HOME
+# The --mount will mount the buildx cache directory to where
+# Poetry and Pip store their cache so that they can re-use it
+RUN --mount=type=cache,target=/root/.cache \
+    curl -sSL https://install.python-poetry.org | python -
+
+COPY poetry.lock pyproject.toml ./
+
+# install runtime deps to $VIRTUAL_ENV
+RUN --mount=type=cache,target=/root/.cache \
+    poetry install --no-root --only main
+
+################################
+# DEVELOPMENT
+# Image used during development / testing
+################################
+FROM builder-base AS development
+
+# quicker install as runtime deps are already installed
+RUN --mount=type=cache,target=/root/.cache \
+    poetry install --no-root --with dev,test,lint
+
+# EXPOSE 8080
+# CMD ["bash"]
+
+
+################################
+# PRODUCTION
+# Final image used for runtime
+################################
+FROM python-base AS production
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates && \
+    apt-get clean
+
+# copy in our built poetry + venv
+COPY --from=builder-base $POETRY_HOME $POETRY_HOME
+COPY --from=builder-base $VIRTUAL_ENV $VIRTUAL_ENV
+
+COPY poetry.lock pyproject.toml ./
+
+# EXPOSE 8080
+# CMD ["python", "my_awesome_ai_project/app.py"]

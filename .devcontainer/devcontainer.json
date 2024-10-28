@@ -2,7 +2,8 @@
 	"name": "Git Testing",
 	"build": {
 		"dockerfile": "Dockerfile",
-		"context": ".."
+		"context": "..",
+		"target": "development"
 	},
 	"customizations": {
 		"vscode": {
